@@ -1,6 +1,6 @@
-name,address,contact
-MedPlus Pharmacy,Ameerpet Hyderabad,9911223344
-Apollo Pharmacy,Banjara Hills Hyderabad,9922334455
-Sun Pharma Store,Kukatpally Hyderabad,9933445566
-LifeCare Medical,Dilsukhnagar Hyderabad,9944556677
-Health First Pharmacy,Secunderabad Hyderabad,9955667788
+name,address,contact,lat,lng
+MedPlus Pharmacy,Ameerpet Hyderabad,9911223344,17.4375,78.4483
+Apollo Pharmacy,Banjara Hills Hyderabad,9922334455,17.4156,78.4347
+Sun Pharma Store,Kukatpally Hyderabad,9933445566,17.4849,78.3996
+LifeCare Medical,Dilsukhnagar Hyderabad,9944556677,17.3688,78.5247
+Health First Pharmacy,Secunderabad Hyderabad,9955667788,17.4399,78.4983

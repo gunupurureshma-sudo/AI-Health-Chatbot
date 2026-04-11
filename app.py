@@ -96,6 +96,28 @@ st.markdown("""
         border-bottom: 2px solid #00b4d8;
         padding-bottom: 8px;
     }
+    .call-btn {
+        display: inline-block;
+        background: linear-gradient(90deg, #2ecc71, #27ae60);
+        color: white;
+        padding: 8px 20px;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: bold;
+        font-size: 14px;
+        margin: 5px 2px;
+    }
+    .map-btn {
+        display: inline-block;
+        background: linear-gradient(90deg, #e74c3c, #c0392b);
+        color: white;
+        padding: 8px 20px;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: bold;
+        font-size: 14px;
+        margin: 5px 2px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -197,6 +219,15 @@ def predict_disease(symptoms_list):
     disease = le.inverse_transform([pred_class])[0]
     confidence = round(pred_proba[pred_class] * 100, 2)
     return disease, confidence
+
+
+# ------------------ Google Maps URL ------------------
+def get_maps_url(lat, lng, name):
+    return f"https://www.google.com/maps/search/?api=1&query={lat},{lng}"
+
+
+def get_directions_url(lat, lng):
+    return f"https://www.google.com/maps/dir/?api=1&destination={lat},{lng}"
 
 
 # ------------------ PDF Generator ------------------
@@ -421,31 +452,75 @@ elif page == "👨‍⚕️ Find Doctors":
         filtered = doctors_df[doctors_df['specialization'] == specialization_filter]
 
     for _, doc in filtered.iterrows():
+        maps_url = get_maps_url(doc['lat'], doc['lng'], doc['name'])
+        directions_url = get_directions_url(doc['lat'], doc['lng'])
+        call_url = "tel:" + str(doc['contact'])
+
         st.markdown(
             "<div class='doctor-card'>"
-            "<h3>" + doc['name'] + "</h3>"
-            "<p><b>Specialization:</b> " + doc['specialization'] + "</p>"
-            "<p><b>Clinic:</b> " + doc['clinic'] + "</p>"
-            "<p><b>Contact:</b> " + str(doc['contact']) + "</p>"
-            "<p><b>Location:</b> " + doc['location'] + "</p>"
-            "<p><b>Available Slots:</b> " + doc['slots'] + "</p>"
+            "<h3>👨‍⚕️ " + doc['name'] + "</h3>"
+            "<p>🩺 <b>Specialization:</b> " + doc['specialization'] + "</p>"
+            "<p>🏥 <b>Clinic:</b> " + doc['clinic'] + "</p>"
+            "<p>📞 <b>Contact:</b> " + str(doc['contact']) + "</p>"
+            "<p>📍 <b>Location:</b> " + doc['location'] + "</p>"
+            "<p>🕐 <b>Available Slots:</b> " + doc['slots'] + "</p>"
+            "<br>"
+            "<a href='" + call_url + "' class='call-btn'>📞 Call Doctor</a>"
+            "<a href='" + maps_url + "' target='_blank' class='map-btn'>📍 View on Maps</a>"
+            "<a href='" + directions_url + "' target='_blank' class='map-btn'>🗺️ Get Directions</a>"
             "</div>",
             unsafe_allow_html=True
         )
+
+    # Show all doctors on embedded map
+    st.markdown("<div class='section-title'>🗺️ Doctors Location Map</div>", unsafe_allow_html=True)
+    map_html = """
+    <iframe
+        width="100%"
+        height="400"
+        frameborder="0"
+        style="border-radius:16px; border:2px solid #00b4d8;"
+        src="https://www.google.com/maps/embed/v1/search?key=AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY&q=doctors+in+Hyderabad"
+        allowfullscreen>
+    </iframe>
+    """
+    st.markdown(map_html, unsafe_allow_html=True)
 
 
 # ==================== PAGE 3 - PHARMACIES ====================
 elif page == "💊 Find Pharmacies":
     st.markdown("<div class='section-title'>💊 Nearby Pharmacies</div>", unsafe_allow_html=True)
     for _, pharmacy in pharmacies_df.iterrows():
+        maps_url = get_maps_url(pharmacy['lat'], pharmacy['lng'], pharmacy['name'])
+        directions_url = get_directions_url(pharmacy['lat'], pharmacy['lng'])
+        call_url = "tel:" + str(pharmacy['contact'])
+
         st.markdown(
             "<div class='pharmacy-card'>"
-            "<h3>" + pharmacy['name'] + "</h3>"
-            "<p><b>Address:</b> " + pharmacy['address'] + "</p>"
-            "<p><b>Contact:</b> " + str(pharmacy['contact']) + "</p>"
+            "<h3>💊 " + pharmacy['name'] + "</h3>"
+            "<p>📍 <b>Address:</b> " + pharmacy['address'] + "</p>"
+            "<p>📞 <b>Contact:</b> " + str(pharmacy['contact']) + "</p>"
+            "<br>"
+            "<a href='" + call_url + "' class='call-btn'>📞 Call Pharmacy</a>"
+            "<a href='" + maps_url + "' target='_blank' class='map-btn'>📍 View on Maps</a>"
+            "<a href='" + directions_url + "' target='_blank' class='map-btn'>🗺️ Get Directions</a>"
             "</div>",
             unsafe_allow_html=True
         )
+
+    # Show all pharmacies on embedded map
+    st.markdown("<div class='section-title'>🗺️ Pharmacies Location Map</div>", unsafe_allow_html=True)
+    map_html = """
+    <iframe
+        width="100%"
+        height="400"
+        frameborder="0"
+        style="border-radius:16px; border:2px solid #1abc9c;"
+        src="https://www.google.com/maps/embed/v1/search?key=AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY&q=pharmacy+in+Hyderabad"
+        allowfullscreen>
+    </iframe>
+    """
+    st.markdown(map_html, unsafe_allow_html=True)
 
 
 # ==================== PAGE 4 - BOOKING ====================
@@ -460,11 +535,20 @@ elif page == "📅 Book Appointment":
     selected_doctor = st.selectbox("Select Doctor", doctors_df['name'].tolist())
     doctor_info = doctors_df[doctors_df['name'] == selected_doctor].iloc[0]
 
+    maps_url = get_maps_url(doctor_info['lat'], doctor_info['lng'], doctor_info['name'])
+    directions_url = get_directions_url(doctor_info['lat'], doctor_info['lng'])
+    call_url = "tel:" + str(doctor_info['contact'])
+
     st.markdown(
         "<div class='doctor-card'>"
-        "<p><b>Clinic:</b> " + doctor_info['clinic'] + "</p>"
-        "<p><b>Specialization:</b> " + doctor_info['specialization'] + "</p>"
-        "<p><b>Location:</b> " + doctor_info['location'] + "</p>"
+        "<p>🏥 <b>Clinic:</b> " + doctor_info['clinic'] + "</p>"
+        "<p>🩺 <b>Specialization:</b> " + doctor_info['specialization'] + "</p>"
+        "<p>📍 <b>Location:</b> " + doctor_info['location'] + "</p>"
+        "<p>📞 <b>Contact:</b> " + str(doctor_info['contact']) + "</p>"
+        "<br>"
+        "<a href='" + call_url + "' class='call-btn'>📞 Call Doctor</a>"
+        "<a href='" + maps_url + "' target='_blank' class='map-btn'>📍 View on Maps</a>"
+        "<a href='" + directions_url + "' target='_blank' class='map-btn'>🗺️ Get Directions</a>"
         "</div>",
         unsafe_allow_html=True
     )
@@ -486,7 +570,7 @@ elif page == "📅 Book Appointment":
             st.balloons()
             st.markdown(
                 "<div class='result-card'>"
-                "<h2>Appointment Confirmed!</h2>"
+                "<h2>🎉 Appointment Confirmed!</h2>"
                 "<p><b>Patient:</b> " + patient_name + "</p>"
                 "<p><b>Contact:</b> " + patient_contact + "</p>"
                 "<p><b>Doctor:</b> " + selected_doctor + "</p>"
@@ -496,5 +580,9 @@ elif page == "📅 Book Appointment":
                 "<p><b>Time:</b> " + selected_slot + "</p>"
                 "<p><b>Doctor Contact:</b> " + str(doctor_info['contact']) + "</p>"
                 "</div>",
+                unsafe_allow_html=True
+            )
+            st.markdown(
+                "<a href='" + directions_url + "' target='_blank' class='map-btn'>🗺️ Get Directions to Clinic</a>",
                 unsafe_allow_html=True
             )
