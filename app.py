@@ -7,7 +7,6 @@ import re
 import warnings
 import tempfile
 import sqlite3
-import os
 from sklearn import preprocessing
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
@@ -143,39 +142,26 @@ st.markdown("""
 def init_db():
     conn = sqlite3.connect('health_app.db')
     c = conn.cursor()
-
-    # Doctors table
     c.execute('''CREATE TABLE IF NOT EXISTS doctors (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT, specialization TEXT, clinic TEXT,
         contact TEXT, slots TEXT, location TEXT,
-        lat REAL, lng REAL
-    )''')
-
-    # Pharmacies table
+        lat REAL, lng REAL)''')
     c.execute('''CREATE TABLE IF NOT EXISTS pharmacies (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT, address TEXT, contact TEXT,
-        lat REAL, lng REAL
-    )''')
-
-    # Hospitals table
+        lat REAL, lng REAL)''')
     c.execute('''CREATE TABLE IF NOT EXISTS hospitals (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT, address TEXT, contact TEXT,
         speciality TEXT, beds INTEGER,
-        lat REAL, lng REAL
-    )''')
-
-    # Appointments table
+        lat REAL, lng REAL)''')
     c.execute('''CREATE TABLE IF NOT EXISTS appointments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         patient_name TEXT, patient_contact TEXT,
         doctor_name TEXT, clinic TEXT,
         date TEXT, slot TEXT, disease TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )''')
-
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     conn.commit()
     conn.close()
 
@@ -194,8 +180,7 @@ def load_model():
     le = preprocessing.LabelEncoder()
     y_encoded = le.fit_transform(y)
     x_train, x_test, y_train, y_test = train_test_split(
-        x, y_encoded, test_size=0.33, random_state=42
-    )
+        x, y_encoded, test_size=0.33, random_state=42)
     model = RandomForestClassifier(n_estimators=300, random_state=42)
     model.fit(x_train, y_train)
     symptoms_dict = {symptom: idx for idx, symptom in enumerate(cols)}
@@ -233,7 +218,7 @@ doctors_df = load_doctors()
 pharmacies_df = load_pharmacies()
 
 
-# ------------------ Symptom Extraction ------------------
+# ------------------ Helpers ------------------
 symptom_synonyms = {
     "stomach ache": "stomach_pain",
     "belly pain": "stomach_pain",
@@ -260,8 +245,7 @@ def extract_symptoms(user_input, all_symptoms):
     words = re.findall(r"\w+", text)
     for word in words:
         close = get_close_matches(
-            word, [s.replace("_", " ") for s in all_symptoms], n=1, cutoff=0.8
-        )
+            word, [s.replace("_", " ") for s in all_symptoms], n=1, cutoff=0.8)
         if close:
             for sym in all_symptoms:
                 if sym.replace("_", " ") == close[0]:
@@ -281,16 +265,19 @@ def predict_disease(symptoms_list):
     return disease, confidence
 
 
-# ------------------ Maps URL ------------------
 def get_maps_url(lat, lng):
-    return f"https://www.google.com/maps/search/?api=1&query={lat},{lng}"
+    return "https://www.google.com/maps/search/?api=1&query=" + str(lat) + "," + str(lng)
 
 
 def get_directions_url(lat, lng):
-    return f"https://www.google.com/maps/dir/?api=1&destination={lat},{lng}"
+    return "https://www.google.com/maps/dir/?api=1&destination=" + str(lat) + "," + str(lng)
 
 
-# ------------------ PDF Generator ------------------
+def get_maps_search_url(query):
+    return "https://www.google.com/maps/search/" + query.replace(" ", "+")
+
+
+# ------------------ PDF ------------------
 def generate_pdf(name, age, gender, symptoms_list, disease, confidence, description, precautions):
     pdf = FPDF()
     pdf.add_page()
@@ -348,7 +335,6 @@ def generate_pdf(name, age, gender, symptoms_list, disease, confidence, descript
     return tmp.name
 
 
-# ------------------ Quotes ------------------
 quotes = [
     "Health is wealth, take care of yourself.",
     "A healthy outside starts from the inside.",
@@ -376,7 +362,7 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("<p style='color:#8892a4; font-size:12px;'>Built with love using Python & ML</p>", unsafe_allow_html=True)
 
-# ------------------ Header ------------------
+# Header
 st.markdown("<div class='header-title'>🏥 AI Health ChatBot</div>", unsafe_allow_html=True)
 st.markdown("<div class='subtitle'>Your personal AI-powered health assistant</div>", unsafe_allow_html=True)
 st.markdown("---")
@@ -397,8 +383,7 @@ if page == "🏠 Home & Diagnosis":
     symptoms_input = st.text_area(
         "Type your symptoms below",
         placeholder="e.g. I have fever and headache and stomach pain",
-        height=100
-    )
+        height=100)
     col1, col2 = st.columns(2)
     with col1:
         num_days = st.slider("Days with symptoms", 1, 30, 3)
@@ -422,7 +407,6 @@ if page == "🏠 Home & Diagnosis":
                 st.success("Detected: " + ", ".join(symptoms_list))
                 disease, confidence = predict_disease(symptoms_list)
 
-                # Store in session
                 st.session_state['disease'] = disease
                 st.session_state['patient_name'] = name
                 st.session_state['symptoms_list'] = symptoms_list
@@ -466,7 +450,7 @@ if page == "🏠 Home & Diagnosis":
                 else:
                     st.success("Follow the precautions and monitor your symptoms.")
 
-                # PDF Download
+                # PDF
                 st.markdown("<br>", unsafe_allow_html=True)
                 precs_for_pdf = precautionDictionary.get(disease, ["", "", "", ""])
                 pdf_path = generate_pdf(name, age, gender, symptoms_list, disease, confidence, desc, precs_for_pdf)
@@ -476,10 +460,9 @@ if page == "🏠 Home & Diagnosis":
                         data=f,
                         file_name=name + "_health_report.pdf",
                         mime="application/pdf",
-                        use_container_width=True
-                    )
+                        use_container_width=True)
 
-                # -------- CHATBOT FLOW --------
+                # Chatbot Flow
                 st.markdown("---")
                 st.markdown(
                     "<div class='chatbot-bubble'>"
@@ -501,7 +484,6 @@ if page == "🏠 Home & Diagnosis":
                             "<p>💡 " + random.choice(quotes) + "</p>"
                             "</div>", unsafe_allow_html=True)
 
-                # Show doctors if Yes clicked
                 if st.session_state.get('show_doctors', False):
                     st.markdown("<div class='section-title'>👨‍⚕️ Recommended Doctors</div>", unsafe_allow_html=True)
                     for _, doc in doctors_df.iterrows():
@@ -520,22 +502,23 @@ if page == "🏠 Home & Diagnosis":
                             "<a href='" + maps_url + "' target='_blank' class='map-btn'>📍 Maps</a>"
                             "<a href='" + directions_url + "' target='_blank' class='map-btn'>🗺️ Directions</a>"
                             "</div>", unsafe_allow_html=True)
-
-                    st.info("👉 Go to **Book Appointment** from the sidebar to book a slot!")
+                    st.info("Go to Book Appointment from the sidebar to book a slot!")
 
 
 # ==================== PAGE 2 - DOCTORS ====================
 elif page == "👨‍⚕️ Find Doctors":
     st.markdown("<div class='section-title'>👨‍⚕️ Find Nearby Doctors</div>", unsafe_allow_html=True)
 
-    # GPS Location
-    st.markdown("<div class='card'><p>📍 <b>Your Location:</b> Enter your area to find nearby doctors</p></div>", unsafe_allow_html=True)
     user_location = st.text_input("Enter your area/city", placeholder="e.g. Hyderabad, Ameerpet")
+    if user_location:
+        maps_search = get_maps_search_url("doctors in " + user_location)
+        st.markdown(
+            "<a href='" + maps_search + "' target='_blank' class='map-btn'>🗺️ Search Doctors Near " + user_location + " on Google Maps</a>",
+            unsafe_allow_html=True)
 
     specialization_filter = st.selectbox(
         "Filter by Specialization",
-        ["All"] + list(doctors_df['specialization'].unique())
-    )
+        ["All"] + list(doctors_df['specialization'].unique()))
     if specialization_filter == "All":
         filtered = doctors_df
     else:
@@ -559,26 +542,18 @@ elif page == "👨‍⚕️ Find Doctors":
             "<a href='" + directions_url + "' target='_blank' class='map-btn'>🗺️ Get Directions</a>"
             "</div>", unsafe_allow_html=True)
 
-    # Map
-    st.markdown("<div class='section-title'>🗺️ Doctors Map</div>", unsafe_allow_html=True)
-    if user_location:
-        map_query = "doctors+in+" + user_location.replace(" ", "+")
-    else:
-        map_query = "doctors+in+Hyderabad"
-    st.markdown(
-        "<iframe width='100%' height='400' frameborder='0' "
-        "style='border-radius:16px; border:2px solid #00b4d8;' "
-        "src='https://www.google.com/maps/embed/v1/search?key=AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY&q=" + map_query + "' "
-        "allowfullscreen></iframe>", unsafe_allow_html=True)
-
 
 # ==================== PAGE 3 - HOSPITALS ====================
 elif page == "🏥 Find Hospitals":
     st.markdown("<div class='section-title'>🏥 Nearby Hospitals</div>", unsafe_allow_html=True)
 
     user_location = st.text_input("Enter your area/city", placeholder="e.g. Hyderabad, Ameerpet")
+    if user_location:
+        maps_search = get_maps_search_url("hospitals in " + user_location)
+        st.markdown(
+            "<a href='" + maps_search + "' target='_blank' class='map-btn'>🗺️ Search Hospitals Near " + user_location + " on Google Maps</a>",
+            unsafe_allow_html=True)
 
-    # Sample hospitals data
     hospitals = [
         {"name": "Apollo Hospital", "address": "Jubilee Hills, Hyderabad", "contact": "9040000000", "speciality": "Multi-Specialty", "beds": 500, "lat": 17.4239, "lng": 78.4738},
         {"name": "KIMS Hospital", "address": "Secunderabad, Hyderabad", "contact": "9040000001", "speciality": "Multi-Specialty", "beds": 400, "lat": 17.4399, "lng": 78.4983},
@@ -604,24 +579,17 @@ elif page == "🏥 Find Hospitals":
             "<a href='" + directions_url + "' target='_blank' class='map-btn'>🗺️ Get Directions</a>"
             "</div>", unsafe_allow_html=True)
 
-    # Map
-    st.markdown("<div class='section-title'>🗺️ Hospitals Map</div>", unsafe_allow_html=True)
-    if user_location:
-        map_query = "hospitals+in+" + user_location.replace(" ", "+")
-    else:
-        map_query = "hospitals+in+Hyderabad"
-    st.markdown(
-        "<iframe width='100%' height='400' frameborder='0' "
-        "style='border-radius:16px; border:2px solid #e74c3c;' "
-        "src='https://www.google.com/maps/embed/v1/search?key=AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY&q=" + map_query + "' "
-        "allowfullscreen></iframe>", unsafe_allow_html=True)
-
 
 # ==================== PAGE 4 - PHARMACIES ====================
 elif page == "💊 Find Pharmacies":
     st.markdown("<div class='section-title'>💊 Nearby Pharmacies</div>", unsafe_allow_html=True)
 
     user_location = st.text_input("Enter your area/city", placeholder="e.g. Hyderabad, Ameerpet")
+    if user_location:
+        maps_search = get_maps_search_url("pharmacy in " + user_location)
+        st.markdown(
+            "<a href='" + maps_search + "' target='_blank' class='map-btn'>🗺️ Search Pharmacies Near " + user_location + " on Google Maps</a>",
+            unsafe_allow_html=True)
 
     for _, pharmacy in pharmacies_df.iterrows():
         maps_url = get_maps_url(pharmacy['lat'], pharmacy['lng'])
@@ -637,18 +605,6 @@ elif page == "💊 Find Pharmacies":
             "<a href='" + maps_url + "' target='_blank' class='map-btn'>📍 View on Maps</a>"
             "<a href='" + directions_url + "' target='_blank' class='map-btn'>🗺️ Get Directions</a>"
             "</div>", unsafe_allow_html=True)
-
-    # Map
-    st.markdown("<div class='section-title'>🗺️ Pharmacies Map</div>", unsafe_allow_html=True)
-    if user_location:
-        map_query = "pharmacy+in+" + user_location.replace(" ", "+")
-    else:
-        map_query = "pharmacy+in+Hyderabad"
-    st.markdown(
-        "<iframe width='100%' height='400' frameborder='0' "
-        "style='border-radius:16px; border:2px solid #1abc9c;' "
-        "src='https://www.google.com/maps/embed/v1/search?key=AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY&q=" + map_query + "' "
-        "allowfullscreen></iframe>", unsafe_allow_html=True)
 
 
 # ==================== PAGE 5 - BOOKING ====================
@@ -695,7 +651,6 @@ elif page == "📅 Book Appointment":
         elif not patient_contact:
             st.warning("Please enter your contact number.")
         else:
-            # Save to database
             conn = sqlite3.connect('health_app.db')
             c = conn.cursor()
             c.execute('''INSERT INTO appointments
@@ -705,7 +660,6 @@ elif page == "📅 Book Appointment":
                  doctor_info['clinic'], str(appointment_date), selected_slot, disease_info))
             conn.commit()
             conn.close()
-
             st.balloons()
             st.markdown(
                 "<div class='result-card'>"
@@ -726,7 +680,6 @@ elif page == "📅 Book Appointment":
 # ==================== PAGE 6 - MY APPOINTMENTS ====================
 elif page == "📋 My Appointments":
     st.markdown("<div class='section-title'>📋 My Appointments</div>", unsafe_allow_html=True)
-
     search_name = st.text_input("Enter your name to find appointments")
 
     if st.button("🔍 Find My Appointments"):
@@ -738,7 +691,6 @@ elif page == "📋 My Appointments":
                 "SELECT * FROM appointments WHERE patient_name LIKE ?",
                 conn, params=('%' + search_name + '%',))
             conn.close()
-
             if df.empty:
                 st.info("No appointments found for " + search_name)
             else:
@@ -757,7 +709,6 @@ elif page == "📋 My Appointments":
 # ==================== PAGE 7 - REGISTER DOCTOR ====================
 elif page == "➕ Register Doctor":
     st.markdown("<div class='section-title'>➕ Doctor Registration</div>", unsafe_allow_html=True)
-
     col1, col2 = st.columns(2)
     with col1:
         doc_name = st.text_input("Doctor Name")
@@ -770,7 +721,7 @@ elif page == "➕ Register Doctor":
         doc_lat = st.number_input("Latitude", value=17.3850, format="%.4f")
         doc_lng = st.number_input("Longitude", value=78.4867, format="%.4f")
 
-    if st.button("✅ Register Doctor"):
+    if st.button("Register Doctor"):
         if not doc_name or not doc_contact:
             st.warning("Please fill all required fields.")
         else:
@@ -783,14 +734,13 @@ elif page == "➕ Register Doctor":
                  doc_slots, doc_location, doc_lat, doc_lng))
             conn.commit()
             conn.close()
-            st.success("Doctor registered successfully!")
+            st.success("Doctor " + doc_name + " registered successfully!")
             st.balloons()
 
 
 # ==================== PAGE 8 - REGISTER HOSPITAL ====================
 elif page == "➕ Register Hospital":
     st.markdown("<div class='section-title'>➕ Hospital Registration</div>", unsafe_allow_html=True)
-
     col1, col2 = st.columns(2)
     with col1:
         hosp_name = st.text_input("Hospital Name")
@@ -802,7 +752,7 @@ elif page == "➕ Register Hospital":
         hosp_lat = st.number_input("Latitude", value=17.3850, format="%.4f")
         hosp_lng = st.number_input("Longitude", value=78.4867, format="%.4f")
 
-    if st.button("✅ Register Hospital"):
+    if st.button("Register Hospital"):
         if not hosp_name or not hosp_contact:
             st.warning("Please fill all required fields.")
         else:
@@ -815,14 +765,13 @@ elif page == "➕ Register Hospital":
                  hosp_spec, hosp_beds, hosp_lat, hosp_lng))
             conn.commit()
             conn.close()
-            st.success("Hospital registered successfully!")
+            st.success("Hospital " + hosp_name + " registered successfully!")
             st.balloons()
 
 
 # ==================== PAGE 9 - REGISTER PHARMACY ====================
 elif page == "➕ Register Pharmacy":
     st.markdown("<div class='section-title'>➕ Pharmacy Registration</div>", unsafe_allow_html=True)
-
     col1, col2 = st.columns(2)
     with col1:
         pharm_name = st.text_input("Pharmacy/Shop Name")
@@ -832,7 +781,7 @@ elif page == "➕ Register Pharmacy":
         pharm_lat = st.number_input("Latitude", value=17.3850, format="%.4f")
         pharm_lng = st.number_input("Longitude", value=78.4867, format="%.4f")
 
-    if st.button("✅ Register Pharmacy"):
+    if st.button("Register Pharmacy"):
         if not pharm_name or not pharm_contact:
             st.warning("Please fill all required fields.")
         else:
@@ -845,5 +794,5 @@ elif page == "➕ Register Pharmacy":
                  pharm_lat, pharm_lng))
             conn.commit()
             conn.close()
-            st.success("Pharmacy registered successfully!")
+            st.success("Pharmacy " + pharm_name + " registered successfully!")
             st.balloons()
