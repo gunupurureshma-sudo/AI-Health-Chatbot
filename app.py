@@ -8,6 +8,12 @@ import warnings
 import tempfile
 import sqlite3
 import hashlib
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import plotly.express as px
+import plotly.graph_objects as go
+from datetime import datetime, date
 from sklearn import preprocessing
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
@@ -18,18 +24,174 @@ warnings.filterwarnings("ignore")
 
 st.set_page_config(page_title="AI Health ChatBot", page_icon="🏥", layout="wide")
 
+# ------------------ Multi Language ------------------
+LANGUAGES = {
+    "English": {
+        "title": "🏥 AI Health ChatBot",
+        "subtitle": "Your personal AI-powered health assistant",
+        "patient": "Patient",
+        "doctor": "Doctor",
+        "admin": "Admin",
+        "login": "Login",
+        "signup": "Sign Up",
+        "logout": "Logout",
+        "symptoms": "Describe Your Symptoms",
+        "predict": "Predict Disease",
+        "name": "Full Name",
+        "email": "Email",
+        "password": "Password",
+        "age": "Age",
+        "gender": "Gender",
+        "contact": "Contact Number",
+        "welcome": "Welcome",
+        "book": "Book Appointment",
+        "my_appointments": "My Appointments",
+        "find_doctors": "Find Doctors",
+        "find_hospitals": "Find Hospitals",
+        "find_pharmacies": "Find Pharmacies",
+        "profile": "My Profile",
+        "dashboard": "Dashboard",
+        "top3": "Top 3 Possible Diseases",
+        "detected": "Detected symptoms",
+        "tips": "Tips for better prediction",
+    },
+    "Telugu": {
+        "title": "🏥 AI హెల్త్ చాట్‌బాట్",
+        "subtitle": "మీ వ్యక్తిగత AI ఆరోగ్య సహాయకుడు",
+        "patient": "రోగి",
+        "doctor": "డాక్టర్",
+        "admin": "అడ్మిన్",
+        "login": "లాగిన్",
+        "signup": "నమోదు చేయండి",
+        "logout": "లాగ్అవుట్",
+        "symptoms": "మీ లక్షణాలను వివరించండి",
+        "predict": "వ్యాధిని అంచనా వేయండి",
+        "name": "పూర్తి పేరు",
+        "email": "ఇమెయిల్",
+        "password": "పాస్వర్డ్",
+        "age": "వయస్సు",
+        "gender": "లింగం",
+        "contact": "సంప్రదింపు నంబర్",
+        "welcome": "స్వాగతం",
+        "book": "అపాయింట్‌మెంట్ బుక్ చేయండి",
+        "my_appointments": "నా అపాయింట్‌మెంట్లు",
+        "find_doctors": "డాక్టర్లను కనుగొనండి",
+        "find_hospitals": "ఆసుపత్రులను కనుగొనండి",
+        "find_pharmacies": "మందుల దుకాణాలు కనుగొనండి",
+        "profile": "నా ప్రొఫైల్",
+        "dashboard": "డాష్‌బోర్డ్",
+        "top3": "అగ్ర 3 సాధ్యమైన వ్యాధులు",
+        "detected": "గుర్తించిన లక్షణాలు",
+        "tips": "మెరుగైన అంచనా కోసం చిట్కాలు",
+    },
+    "Hindi": {
+        "title": "🏥 AI हेल्थ चैटबॉट",
+        "subtitle": "आपका व्यक्तिगत AI स्वास्थ्य सहायक",
+        "patient": "मरीज़",
+        "doctor": "डॉक्टर",
+        "admin": "एडमिन",
+        "login": "लॉगिन",
+        "signup": "साइन अप",
+        "logout": "लॉगआउट",
+        "symptoms": "अपने लक्षण बताएं",
+        "predict": "बीमारी का अनुमान लगाएं",
+        "name": "पूरा नाम",
+        "email": "ईमेल",
+        "password": "पासवर्ड",
+        "age": "आयु",
+        "gender": "लिंग",
+        "contact": "संपर्क नंबर",
+        "welcome": "स्वागत है",
+        "book": "अपॉइंटमेंट बुक करें",
+        "my_appointments": "मेरी अपॉइंटमेंट",
+        "find_doctors": "डॉक्टर खोजें",
+        "find_hospitals": "अस्पताल खोजें",
+        "find_pharmacies": "फार्मेसी खोजें",
+        "profile": "मेरी प्रोफाइल",
+        "dashboard": "डैशबोर्ड",
+        "top3": "शीर्ष 3 संभावित बीमारियां",
+        "detected": "पहचाने गए लक्षण",
+        "tips": "बेहतर भविष्यवाणी के लिए सुझाव",
+    },
+    "Tamil": {
+        "title": "🏥 AI உடல்நல சாட்பாட்",
+        "subtitle": "உங்கள் தனிப்பட்ட AI உடல்நல உதவியாளர்",
+        "patient": "நோயாளி",
+        "doctor": "மருத்துவர்",
+        "admin": "நிர்வாகி",
+        "login": "உள்நுழைய",
+        "signup": "பதிவு செய்யுங்கள்",
+        "logout": "வெளியேறு",
+        "symptoms": "உங்கள் அறிகுறிகளை விவரிக்கவும்",
+        "predict": "நோயை கணிக்கவும்",
+        "name": "முழு பெயர்",
+        "email": "மின்னஞ்சல்",
+        "password": "கடவுச்சொல்",
+        "age": "வயது",
+        "gender": "பாலினம்",
+        "contact": "தொடர்பு எண்",
+        "welcome": "வரவேற்கிறோம்",
+        "book": "சந்திப்பு பதிவு செய்யுங்கள்",
+        "my_appointments": "என் சந்திப்புகள்",
+        "find_doctors": "மருத்துவர்களை கண்டுபிடி",
+        "find_hospitals": "மருத்துவமனைகளை கண்டுபிடி",
+        "find_pharmacies": "மருந்தகங்களை கண்டுபிடி",
+        "profile": "என் சுயவிவரம்",
+        "dashboard": "டாஷ்போர்டு",
+        "top3": "சாத்தியமான முதல் 3 நோய்கள்",
+        "detected": "கண்டறியப்பட்ட அறிகுறிகள்",
+        "tips": "சிறந்த கணிப்புக்கான குறிப்புகள்",
+    }
+}
+
+# Medicine suggestions per disease
+MEDICINE_SUGGESTIONS = {
+    "Fungal infection": ["Fluconazole", "Clotrimazole cream", "Terbinafine"],
+    "Allergy": ["Cetirizine", "Loratadine", "Fexofenadine"],
+    "GERD": ["Omeprazole", "Pantoprazole", "Antacids"],
+    "Chronic cholestasis": ["Ursodeoxycholic acid", "Cholestyramine"],
+    "Drug Reaction": ["Stop medication", "Antihistamines", "Consult doctor"],
+    "Peptic ulcer diseae": ["Omeprazole", "Amoxicillin", "Antacids"],
+    "AIDS": ["Antiretroviral therapy", "Consult specialist"],
+    "Diabetes": ["Metformin", "Insulin", "Glibenclamide"],
+    "Gastroenteritis": ["ORS", "Zinc supplements", "Probiotics"],
+    "Bronchial Asthma": ["Salbutamol inhaler", "Budesonide", "Montelukast"],
+    "Hypertension": ["Amlodipine", "Losartan", "Atenolol"],
+    "Migraine": ["Sumatriptan", "Ibuprofen", "Paracetamol"],
+    "Cervical spondylosis": ["Ibuprofen", "Muscle relaxants", "Physiotherapy"],
+    "Paralysis (brain hemorrhage)": ["Consult neurologist immediately"],
+    "Jaundice": ["Rest", "Hydration", "Consult doctor"],
+    "Malaria": ["Chloroquine", "Artemisinin", "Primaquine"],
+    "Chicken pox": ["Acyclovir", "Calamine lotion", "Paracetamol"],
+    "Dengue": ["Paracetamol", "ORS", "Rest - avoid aspirin"],
+    "Typhoid": ["Ciprofloxacin", "Azithromycin", "Ceftriaxone"],
+    "hepatitis A": ["Rest", "Hydration", "Avoid alcohol"],
+    "Hepatitis B": ["Tenofovir", "Entecavir", "Interferon"],
+    "Hepatitis C": ["Sofosbuvir", "Ribavirin", "Consult specialist"],
+    "Hepatitis D": ["Pegylated interferon", "Consult specialist"],
+    "Hepatitis E": ["Rest", "Hydration", "Supportive care"],
+    "Alcoholic hepatitis": ["Stop alcohol", "Corticosteroids", "Liver support"],
+    "Tuberculosis": ["Rifampicin", "Isoniazid", "Pyrazinamide"],
+    "Common Cold": ["Paracetamol", "Cetirizine", "Steam inhalation"],
+    "Pneumonia": ["Amoxicillin", "Azithromycin", "Rest"],
+    "Dimorphic hemmorhoids(piles)": ["Sitz bath", "Fiber diet", "Hemorrhoid cream"],
+    "Heart attack": ["Aspirin", "Consult emergency immediately"],
+    "Varicose veins": ["Compression stockings", "Exercise", "Elevation"],
+    "Hypothyroidism": ["Levothyroxine", "Regular monitoring"],
+    "Hyperthyroidism": ["Methimazole", "Propylthiouracil", "Beta blockers"],
+    "Hypoglycemia": ["Glucose tablets", "Fruit juice", "Glucagon"],
+    "Osteoarthristis": ["Ibuprofen", "Paracetamol", "Glucosamine"],
+    "Arthritis": ["Ibuprofen", "Methotrexate", "Hydroxychloroquine"],
+    "(vertigo) Paroymsal  Positional Vertigo": ["Epley maneuver", "Meclizine", "Betahistine"],
+    "Acne": ["Benzoyl peroxide", "Salicylic acid", "Tretinoin cream"],
+    "Urinary tract infection": ["Nitrofurantoin", "Ciprofloxacin", "Trimethoprim"],
+    "Psoriasis": ["Topical steroids", "Methotrexate", "Biologics"],
+    "Impetigo": ["Mupirocin cream", "Amoxicillin", "Cephalexin"],
+}
+
 st.markdown("""
 <style>
-    .stButton>button {
-        background: linear-gradient(90deg, #00b4d8, #0077b6);
-        color: white;
-        border-radius: 12px;
-        padding: 12px 24px;
-        font-size: 16px;
-        font-weight: bold;
-        border: none;
-        width: 100%;
-    }
+    .stButton>button { background: linear-gradient(90deg, #00b4d8, #0077b6); color: white; border-radius: 12px; padding: 12px 24px; font-size: 16px; font-weight: bold; border: none; width: 100%; }
     .card { background: linear-gradient(135deg, #1e2130, #252a3d); border-radius: 16px; padding: 20px; margin: 10px 0; border-left: 4px solid #00b4d8; }
     .result-card { background: linear-gradient(135deg, #1a2a1a, #1e3a1e); border-radius: 16px; padding: 24px; margin: 10px 0; border-left: 4px solid #2ecc71; }
     .doctor-card { background: linear-gradient(135deg, #1a1a2e, #16213e); border-radius: 16px; padding: 20px; margin: 10px 0; border-left: 4px solid #9b59b6; }
@@ -38,7 +200,8 @@ st.markdown("""
     .top1-card { background: linear-gradient(135deg, #1a2a1a, #1e3a1e); border-radius: 16px; padding: 20px; margin: 10px 0; border-left: 6px solid #2ecc71; }
     .top2-card { background: linear-gradient(135deg, #2a2a1a, #3a3a1e); border-radius: 16px; padding: 20px; margin: 10px 0; border-left: 6px solid #f39c12; }
     .top3-card { background: linear-gradient(135deg, #2a1a2a, #3a1e3a); border-radius: 16px; padding: 20px; margin: 10px 0; border-left: 6px solid #9b59b6; }
-    .login-card { background: linear-gradient(135deg, #1e2130, #252a3d); border-radius: 20px; padding: 40px; margin: 20px auto; border: 2px solid #00b4d8; max-width: 500px; }
+    .medicine-card { background: linear-gradient(135deg, #1a1a2e, #16213e); border-radius: 16px; padding: 20px; margin: 10px 0; border-left: 4px solid #00b4d8; }
+    .admin-card { background: linear-gradient(135deg, #2a1a1a, #3a1e1e); border-radius: 16px; padding: 20px; margin: 10px 0; border-left: 4px solid #e74c3c; }
     .header-title { font-size: 48px; font-weight: 800; background: linear-gradient(90deg, #00b4d8, #0077b6, #9b59b6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-align: center; padding: 20px 0; }
     .subtitle { text-align: center; color: #8892a4; font-size: 18px; margin-bottom: 30px; }
     .metric-card { background: linear-gradient(135deg, #1e2130, #252a3d); border-radius: 12px; padding: 20px; text-align: center; border: 1px solid #00b4d8; }
@@ -48,8 +211,8 @@ st.markdown("""
     .call-btn { display: inline-block; background: linear-gradient(90deg, #2ecc71, #27ae60); color: white; padding: 8px 20px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 14px; margin: 5px 2px; }
     .map-btn { display: inline-block; background: linear-gradient(90deg, #e74c3c, #c0392b); color: white; padding: 8px 20px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 14px; margin: 5px 2px; }
     .chatbot-bubble { background: linear-gradient(135deg, #1e2130, #252a3d); border-radius: 16px; padding: 20px; margin: 10px 0; border-left: 4px solid #00b4d8; font-size: 18px; }
-    .role-card { background: linear-gradient(135deg, #1e2130, #252a3d); border-radius: 20px; padding: 30px; margin: 10px; border: 2px solid #00b4d8; text-align: center; cursor: pointer; }
     .welcome-card { background: linear-gradient(135deg, #1a2a1a, #1e3a1e); border-radius: 16px; padding: 20px; margin: 10px 0; border-left: 4px solid #2ecc71; }
+    .role-card { background: linear-gradient(135deg, #1e2130, #252a3d); border-radius: 20px; padding: 30px; margin: 10px; border: 2px solid #00b4d8; text-align: center; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -72,28 +235,23 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS appointments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         patient_name TEXT, patient_contact TEXT, patient_email TEXT,
-        doctor_name TEXT, clinic TEXT,
-        date TEXT, slot TEXT, disease TEXT,
+        doctor_name TEXT, clinic TEXT, date TEXT, slot TEXT, disease TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS hospitals_reg (
+    c.execute('''CREATE TABLE IF NOT EXISTS health_history (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT, address TEXT, contact TEXT,
-        speciality TEXT, beds INTEGER, lat REAL, lng REAL)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS pharmacies_reg (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT, address TEXT, contact TEXT, lat REAL, lng REAL)''')
+        patient_email TEXT, disease TEXT, confidence REAL,
+        symptoms TEXT, date TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     conn.commit()
     conn.close()
 
 init_db()
 
 
-# ------------------ Password Hashing ------------------
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 
-# ------------------ Auth Functions ------------------
 def signup_patient(name, email, password, age, gender, contact):
     try:
         conn = sqlite3.connect('health_app.db')
@@ -120,13 +278,12 @@ def signup_doctor(name, email, password, specialization, clinic, contact, slots,
     try:
         conn = sqlite3.connect('health_app.db')
         c = conn.cursor()
-        c.execute('''INSERT INTO doctors_login
-            (name, email, password, specialization, clinic, contact, slots, location, lat, lng)
+        c.execute('''INSERT INTO doctors_login (name, email, password, specialization, clinic, contact, slots, location, lat, lng)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
             (name, email, hash_password(password), specialization, clinic, contact, slots, location, lat, lng))
         conn.commit()
         conn.close()
-        return True, "Doctor account created successfully!"
+        return True, "Doctor account created!"
     except sqlite3.IntegrityError:
         return False, "Email already registered!"
 
@@ -140,7 +297,27 @@ def login_doctor(email, password):
     return doctor
 
 
-# ------------------ Load Model ------------------
+def save_health_history(patient_email, disease, confidence, symptoms):
+    conn = sqlite3.connect('health_app.db')
+    c = conn.cursor()
+    c.execute("INSERT INTO health_history (patient_email, disease, confidence, symptoms, date) VALUES (?, ?, ?, ?, ?)",
+        (patient_email, disease, confidence, ", ".join(symptoms), str(date.today())))
+    conn.commit()
+    conn.close()
+
+
+def send_email_notification(to_email, subject, body):
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = "healthbot.ai@gmail.com"
+        msg['To'] = to_email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'html'))
+        return True
+    except:
+        return False
+
+
 @st.cache_resource
 def load_model():
     training = pd.read_csv('Data/Training.csv')
@@ -188,8 +365,6 @@ description_list, precautionDictionary = load_data()
 doctors_df = load_doctors()
 pharmacies_df = load_pharmacies()
 
-
-# ------------------ Symptom Synonyms ------------------
 symptom_synonyms = {
     "stomach ache": "stomach_pain", "belly pain": "stomach_pain", "tummy pain": "stomach_pain",
     "abdominal pain": "abdominal_pain", "chest pain": "chest_pain", "back pain": "back_pain",
@@ -197,12 +372,11 @@ symptom_synonyms = {
     "muscle pain": "muscle_pain", "body ache": "muscle_pain", "neck pain": "stiff_neck",
     "stiff neck": "stiff_neck", "high temperature": "high_fever", "temperature": "mild_fever",
     "fever": "high_fever", "feaver": "high_fever", "mild fever": "mild_fever",
-    "loose motion": "diarrhea", "motions": "diarrhea", "loose stool": "diarrhea",
-    "vomit": "vomiting", "throwing up": "vomiting", "feel like vomiting": "nausea",
-    "acidity": "acidity", "heartburn": "acidity", "itching": "itching", "itchy": "itching",
-    "skin rash": "skin_rash", "rash": "skin_rash", "yellow skin": "yellowing_of_skin",
-    "jaundice": "yellowing_of_skin", "breathing issue": "breathlessness",
-    "shortness of breath": "breathlessness", "difficulty breathing": "breathlessness",
+    "loose motion": "diarrhea", "motions": "diarrhea", "vomit": "vomiting",
+    "throwing up": "vomiting", "feel like vomiting": "nausea", "acidity": "acidity",
+    "itching": "itching", "itchy": "itching", "skin rash": "skin_rash", "rash": "skin_rash",
+    "yellow skin": "yellowing_of_skin", "jaundice": "yellowing_of_skin",
+    "breathing issue": "breathlessness", "shortness of breath": "breathlessness",
     "coughing": "cough", "dry cough": "cough", "cold": "runny_nose",
     "throat pain": "sore_throat", "sore throat": "sore_throat",
     "tired": "fatigue", "tiredness": "fatigue", "weakness": "weakness",
@@ -327,7 +501,7 @@ quotes = [
     "Remember, self-care is not selfish."
 ]
 
-# ------------------ Session State Init ------------------
+# ------------------ Session State ------------------
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 if 'user_type' not in st.session_state:
@@ -336,60 +510,55 @@ if 'user_data' not in st.session_state:
     st.session_state['user_data'] = None
 if 'show_doctors' not in st.session_state:
     st.session_state['show_doctors'] = False
+if 'language' not in st.session_state:
+    st.session_state['language'] = 'English'
 
+# Language selector in top right
+lang_col1, lang_col2 = st.columns([4, 1])
+with lang_col2:
+    selected_lang = st.selectbox("🌐", list(LANGUAGES.keys()), index=list(LANGUAGES.keys()).index(st.session_state['language']))
+    if selected_lang != st.session_state['language']:
+        st.session_state['language'] = selected_lang
+        st.rerun()
 
-# ==================== HEADER ====================
-st.markdown("<div class='header-title'>🏥 AI Health ChatBot</div>", unsafe_allow_html=True)
-st.markdown("<div class='subtitle'>Your personal AI-powered health assistant</div>", unsafe_allow_html=True)
+L = LANGUAGES[st.session_state['language']]
+
+st.markdown("<div class='header-title'>" + L['title'] + "</div>", unsafe_allow_html=True)
+st.markdown("<div class='subtitle'>" + L['subtitle'] + "</div>", unsafe_allow_html=True)
 st.markdown("---")
 
 
 # ==================== NOT LOGGED IN ====================
 if not st.session_state['logged_in']:
-
-    st.markdown("<h2 style='text-align:center; color:#00b4d8;'>Welcome! Please Login or Sign Up</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align:center; color:#00b4d8;'>" + L['welcome'] + "! Please " + L['login'] + " or " + L['signup'] + "</h2>", unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Role Selection
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
-        st.markdown("""
-        <div class='role-card'>
-            <h1>👤</h1>
-            <h2 style='color:#00b4d8;'>Patient</h2>
-            <p style='color:#8892a4;'>Login or Sign up as a Patient to check your symptoms and book appointments</p>
-        </div>
-        """, unsafe_allow_html=True)
-        role_patient = st.button("👤 Continue as Patient", use_container_width=True)
+        st.markdown("<div class='role-card'><h1>👤</h1><h2 style='color:#00b4d8;'>" + L['patient'] + "</h2></div>", unsafe_allow_html=True)
+        if st.button("👤 " + L['patient'], use_container_width=True):
+            st.session_state['selected_role'] = 'patient'
 
     with col2:
-        st.markdown("""
-        <div class='role-card'>
-            <h1>👨‍⚕️</h1>
-            <h2 style='color:#9b59b6;'>Doctor</h2>
-            <p style='color:#8892a4;'>Login or Sign up as a Doctor to manage your appointments and patients</p>
-        </div>
-        """, unsafe_allow_html=True)
-        role_doctor = st.button("👨‍⚕️ Continue as Doctor", use_container_width=True)
+        st.markdown("<div class='role-card'><h1>👨‍⚕️</h1><h2 style='color:#9b59b6;'>" + L['doctor'] + "</h2></div>", unsafe_allow_html=True)
+        if st.button("👨‍⚕️ " + L['doctor'], use_container_width=True):
+            st.session_state['selected_role'] = 'doctor'
 
-    if role_patient:
-        st.session_state['selected_role'] = 'patient'
-    if role_doctor:
-        st.session_state['selected_role'] = 'doctor'
+    with col3:
+        st.markdown("<div class='role-card'><h1>🔧</h1><h2 style='color:#e74c3c;'>" + L['admin'] + "</h2></div>", unsafe_allow_html=True)
+        if st.button("🔧 " + L['admin'], use_container_width=True):
+            st.session_state['selected_role'] = 'admin'
 
-    # ------------------ PATIENT AUTH ------------------
+    # Patient Auth
     if st.session_state.get('selected_role') == 'patient':
         st.markdown("---")
-        st.markdown("<h3 style='color:#00b4d8; text-align:center;'>👤 Patient Login / Sign Up</h3>", unsafe_allow_html=True)
-
-        tab1, tab2 = st.tabs(["🔐 Login", "📝 Sign Up"])
+        st.markdown("<h3 style='color:#00b4d8; text-align:center;'>👤 " + L['patient'] + " " + L['login'] + " / " + L['signup'] + "</h3>", unsafe_allow_html=True)
+        tab1, tab2 = st.tabs(["🔐 " + L['login'], "📝 " + L['signup']])
 
         with tab1:
-            st.markdown("<br>", unsafe_allow_html=True)
-            p_email = st.text_input("Email", key="p_login_email")
-            p_password = st.text_input("Password", type="password", key="p_login_pass")
-
-            if st.button("🔐 Login as Patient", use_container_width=True):
+            p_email = st.text_input(L['email'], key="p_login_email")
+            p_password = st.text_input(L['password'], type="password", key="p_login_pass")
+            if st.button("🔐 " + L['login'], use_container_width=True, key="p_login_btn"):
                 if not p_email or not p_password:
                     st.warning("Please fill all fields.")
                 else:
@@ -397,28 +566,23 @@ if not st.session_state['logged_in']:
                     if user:
                         st.session_state['logged_in'] = True
                         st.session_state['user_type'] = 'patient'
-                        st.session_state['user_data'] = {
-                            'id': user[0], 'name': user[1], 'email': user[2],
-                            'age': user[4], 'gender': user[5], 'contact': user[6]
-                        }
-                        st.success("Welcome back, " + user[1] + "!")
+                        st.session_state['user_data'] = {'id': user[0], 'name': user[1], 'email': user[2], 'age': user[4], 'gender': user[5], 'contact': user[6]}
+                        st.success(L['welcome'] + " " + user[1] + "!")
                         st.rerun()
                     else:
                         st.error("Invalid email or password!")
 
         with tab2:
-            st.markdown("<br>", unsafe_allow_html=True)
             col1, col2 = st.columns(2)
             with col1:
-                p_name = st.text_input("Full Name", key="p_signup_name")
-                p_email_s = st.text_input("Email", key="p_signup_email")
-                p_password_s = st.text_input("Password", type="password", key="p_signup_pass")
+                p_name = st.text_input(L['name'], key="p_signup_name")
+                p_email_s = st.text_input(L['email'], key="p_signup_email")
+                p_password_s = st.text_input(L['password'], type="password", key="p_signup_pass")
             with col2:
-                p_age = st.number_input("Age", min_value=1, max_value=120, value=25, key="p_signup_age")
-                p_gender = st.selectbox("Gender", ["Male", "Female", "Other"], key="p_signup_gender")
-                p_contact = st.text_input("Contact Number", key="p_signup_contact")
-
-            if st.button("📝 Create Patient Account", use_container_width=True):
+                p_age = st.number_input(L['age'], min_value=1, max_value=120, value=25, key="p_signup_age")
+                p_gender = st.selectbox(L['gender'], ["Male", "Female", "Other"], key="p_signup_gender")
+                p_contact = st.text_input(L['contact'], key="p_signup_contact")
+            if st.button("📝 " + L['signup'], use_container_width=True, key="p_signup_btn"):
                 if not p_name or not p_email_s or not p_password_s:
                     st.warning("Please fill all required fields.")
                 else:
@@ -428,19 +592,16 @@ if not st.session_state['logged_in']:
                     else:
                         st.error(msg)
 
-    # ------------------ DOCTOR AUTH ------------------
+    # Doctor Auth
     elif st.session_state.get('selected_role') == 'doctor':
         st.markdown("---")
-        st.markdown("<h3 style='color:#9b59b6; text-align:center;'>👨‍⚕️ Doctor Login / Sign Up</h3>", unsafe_allow_html=True)
-
-        tab1, tab2 = st.tabs(["🔐 Login", "📝 Sign Up"])
+        st.markdown("<h3 style='color:#9b59b6; text-align:center;'>👨‍⚕️ " + L['doctor'] + " " + L['login'] + " / " + L['signup'] + "</h3>", unsafe_allow_html=True)
+        tab1, tab2 = st.tabs(["🔐 " + L['login'], "📝 " + L['signup']])
 
         with tab1:
-            st.markdown("<br>", unsafe_allow_html=True)
-            d_email = st.text_input("Email", key="d_login_email")
-            d_password = st.text_input("Password", type="password", key="d_login_pass")
-
-            if st.button("🔐 Login as Doctor", use_container_width=True):
+            d_email = st.text_input(L['email'], key="d_login_email")
+            d_password = st.text_input(L['password'], type="password", key="d_login_pass")
+            if st.button("🔐 " + L['login'], use_container_width=True, key="d_login_btn"):
                 if not d_email or not d_password:
                     st.warning("Please fill all fields.")
                 else:
@@ -448,35 +609,28 @@ if not st.session_state['logged_in']:
                     if doctor:
                         st.session_state['logged_in'] = True
                         st.session_state['user_type'] = 'doctor'
-                        st.session_state['user_data'] = {
-                            'id': doctor[0], 'name': doctor[1], 'email': doctor[2],
-                            'specialization': doctor[4], 'clinic': doctor[5],
-                            'contact': doctor[6], 'slots': doctor[7],
-                            'location': doctor[8], 'lat': doctor[9], 'lng': doctor[10]
-                        }
-                        st.success("Welcome Dr. " + doctor[1] + "!")
+                        st.session_state['user_data'] = {'id': doctor[0], 'name': doctor[1], 'email': doctor[2], 'specialization': doctor[4], 'clinic': doctor[5], 'contact': doctor[6], 'slots': doctor[7], 'location': doctor[8], 'lat': doctor[9], 'lng': doctor[10]}
+                        st.success(L['welcome'] + " Dr. " + doctor[1] + "!")
                         st.rerun()
                     else:
                         st.error("Invalid email or password!")
 
         with tab2:
-            st.markdown("<br>", unsafe_allow_html=True)
             col1, col2 = st.columns(2)
             with col1:
-                d_name = st.text_input("Doctor Name", key="d_signup_name")
-                d_email_s = st.text_input("Email", key="d_signup_email")
-                d_password_s = st.text_input("Password", type="password", key="d_signup_pass")
+                d_name = st.text_input(L['name'], key="d_signup_name")
+                d_email_s = st.text_input(L['email'], key="d_signup_email")
+                d_password_s = st.text_input(L['password'], type="password", key="d_signup_pass")
                 d_spec = st.text_input("Specialization", key="d_signup_spec")
-                d_clinic = st.text_input("Clinic/Hospital Name", key="d_signup_clinic")
+                d_clinic = st.text_input("Clinic Name", key="d_signup_clinic")
             with col2:
-                d_contact = st.text_input("Contact Number", key="d_signup_contact")
+                d_contact = st.text_input(L['contact'], key="d_signup_contact")
                 d_slots = st.text_input("Available Slots (e.g. 6:00,6:30,7:00)", key="d_signup_slots")
                 d_location = st.text_input("Location/Area", key="d_signup_location")
                 d_lat = st.number_input("Latitude", value=17.3850, format="%.4f", key="d_signup_lat")
                 d_lng = st.number_input("Longitude", value=78.4867, format="%.4f", key="d_signup_lng")
-
-            if st.button("📝 Create Doctor Account", use_container_width=True):
-                if not d_name or not d_email_s or not d_password_s or not d_spec:
+            if st.button("📝 " + L['signup'], use_container_width=True, key="d_signup_btn"):
+                if not d_name or not d_email_s or not d_password_s:
                     st.warning("Please fill all required fields.")
                 else:
                     success, msg = signup_doctor(d_name, d_email_s, d_password_s, d_spec, d_clinic, d_contact, d_slots, d_location, d_lat, d_lng)
@@ -485,6 +639,21 @@ if not st.session_state['logged_in']:
                     else:
                         st.error(msg)
 
+    # Admin Auth
+    elif st.session_state.get('selected_role') == 'admin':
+        st.markdown("---")
+        st.markdown("<h3 style='color:#e74c3c; text-align:center;'>🔧 Admin Login</h3>", unsafe_allow_html=True)
+        a_password = st.text_input("Admin Password", type="password", key="admin_pass")
+        if st.button("🔐 Login as Admin", use_container_width=True):
+            if a_password == "admin123":
+                st.session_state['logged_in'] = True
+                st.session_state['user_type'] = 'admin'
+                st.session_state['user_data'] = {'name': 'Admin'}
+                st.success("Welcome Admin!")
+                st.rerun()
+            else:
+                st.error("Wrong password! Default password is: admin123")
+
 
 # ==================== PATIENT DASHBOARD ====================
 elif st.session_state['logged_in'] and st.session_state['user_type'] == 'patient':
@@ -492,30 +661,31 @@ elif st.session_state['logged_in'] and st.session_state['user_type'] == 'patient
 
     with st.sidebar:
         st.markdown("<h2 style='color:#00b4d8;'>🏥 HealthBot</h2>", unsafe_allow_html=True)
-        st.markdown("<div class='welcome-card'><p>👤 <b>" + user['name'] + "</b></p><p style='color:#8892a4;'>Patient</p></div>", unsafe_allow_html=True)
+        st.markdown("<div class='welcome-card'><p>👤 <b>" + user['name'] + "</b></p><p style='color:#8892a4;'>" + L['patient'] + "</p></div>", unsafe_allow_html=True)
         st.markdown("---")
         page = st.selectbox("Navigate To", [
-            "🏠 Home & Diagnosis",
-            "👨‍⚕️ Find Doctors",
-            "🏥 Find Hospitals",
-            "💊 Find Pharmacies",
-            "📅 Book Appointment",
-            "📋 My Appointments",
-            "👤 My Profile"
+            "🏠 " + L['dashboard'],
+            "👨‍⚕️ " + L['find_doctors'],
+            "🏥 " + L['find_hospitals'],
+            "💊 " + L['find_pharmacies'],
+            "📅 " + L['book'],
+            "📋 " + L['my_appointments'],
+            "📈 Health History",
+            "👤 " + L['profile']
         ])
         st.markdown("---")
-        if st.button("🚪 Logout", use_container_width=True):
+        if st.button("🚪 " + L['logout'], use_container_width=True):
+            for key in ['logged_in', 'user_type', 'user_data', 'show_doctors', 'disease', 'patient_name']:
+                if key in st.session_state:
+                    del st.session_state[key]
             st.session_state['logged_in'] = False
-            st.session_state['user_type'] = None
-            st.session_state['user_data'] = None
-            st.session_state['show_doctors'] = False
             st.rerun()
 
-    # ---- HOME & DIAGNOSIS ----
-    if page == "🏠 Home & Diagnosis":
-        st.markdown("<div class='section-title'>🤒 Describe Your Symptoms</div>", unsafe_allow_html=True)
+    # HOME & DIAGNOSIS
+    if "Dashboard" in page or "డాష్" in page or "डैश" in page or "டாஷ்" in page:
+        st.markdown("<div class='section-title'>🤒 " + L['symptoms'] + "</div>", unsafe_allow_html=True)
 
-        with st.expander("💡 Tips for better prediction"):
+        with st.expander("💡 " + L['tips']):
             st.write("✅ Add at least 4-5 symptoms for accurate results")
             st.write("✅ Use 'and' between symptoms")
             st.write("✅ Examples: fever, headache, nausea, joint pain, fatigue")
@@ -529,19 +699,17 @@ elif st.session_state['logged_in'] and st.session_state['user_type'] == 'patient
         with col2:
             severity = st.slider("Severity (1=mild, 10=severe)", 1, 10, 5)
 
-        st.markdown("<br>", unsafe_allow_html=True)
-
-        if st.button("🔍 Predict Disease"):
+        if st.button("🔍 " + L['predict']):
             if not symptoms_input:
                 st.warning("Please describe your symptoms.")
             else:
-                with st.spinner("Analyzing your symptoms..."):
+                with st.spinner("Analyzing..."):
                     symptoms_list = extract_symptoms(symptoms_input, cols)
 
                 if not symptoms_list:
                     st.error("Could not detect symptoms. Please try: fever, headache, nausea, fatigue")
                 else:
-                    st.success("Detected " + str(len(symptoms_list)) + " symptoms: " + ", ".join(symptoms_list))
+                    st.success(L['detected'] + ": " + ", ".join(symptoms_list))
                     top3 = predict_top3(symptoms_list)
                     top_disease = top3[0]['disease']
                     top_confidence = top3[0]['confidence']
@@ -549,45 +717,55 @@ elif st.session_state['logged_in'] and st.session_state['user_type'] == 'patient
                     st.session_state['disease'] = top_disease
                     st.session_state['patient_name'] = user['name']
 
-                    st.markdown("<div class='section-title'>🏆 Top 3 Possible Diseases</div>", unsafe_allow_html=True)
+                    # Save health history
+                    save_health_history(user['email'], top_disease, top_confidence, symptoms_list)
+
+                    st.markdown("<div class='section-title'>🏆 " + L['top3'] + "</div>", unsafe_allow_html=True)
 
                     st.markdown(
-                        "<div class='top1-card'><h3>🥇 #1 Most Likely: " + top3[0]['disease'] + "</h3>"
+                        "<div class='top1-card'><h3>🥇 #1 " + top3[0]['disease'] + "</h3>"
                         "<p>Confidence: <b style='color:#2ecc71; font-size:24px;'>" + str(top3[0]['confidence']) + "%</b></p>"
                         "<div style='background:#2ecc71; width:" + str(min(top3[0]['confidence'], 100)) + "%; height:12px; border-radius:6px;'></div>"
                         "</div>", unsafe_allow_html=True)
 
                     if top3[1]['confidence'] > 0:
                         st.markdown(
-                            "<div class='top2-card'><h3>🥈 #2 Possible: " + top3[1]['disease'] + "</h3>"
+                            "<div class='top2-card'><h3>🥈 #2 " + top3[1]['disease'] + "</h3>"
                             "<p>Confidence: <b style='color:#f39c12; font-size:20px;'>" + str(top3[1]['confidence']) + "%</b></p>"
                             "<div style='background:#f39c12; width:" + str(min(top3[1]['confidence'], 100)) + "%; height:12px; border-radius:6px;'></div>"
                             "</div>", unsafe_allow_html=True)
 
                     if top3[2]['confidence'] > 0:
                         st.markdown(
-                            "<div class='top3-card'><h3>🥉 #3 Also Possible: " + top3[2]['disease'] + "</h3>"
+                            "<div class='top3-card'><h3>🥉 #3 " + top3[2]['disease'] + "</h3>"
                             "<p>Confidence: <b style='color:#9b59b6; font-size:18px;'>" + str(top3[2]['confidence']) + "%</b></p>"
                             "<div style='background:#9b59b6; width:" + str(min(top3[2]['confidence'], 100)) + "%; height:12px; border-radius:6px;'></div>"
                             "</div>", unsafe_allow_html=True)
 
                     desc = description_list.get(top_disease, "No description available.")
-                    st.markdown(
-                        "<div class='result-card'><h4>About " + top_disease + "</h4><p>" + desc + "</p></div>",
-                        unsafe_allow_html=True)
+                    st.markdown("<div class='result-card'><h4>About " + top_disease + "</h4><p>" + desc + "</p></div>", unsafe_allow_html=True)
 
                     if top_disease in precautionDictionary:
                         precs = precautionDictionary[top_disease]
                         st.markdown(
-                            "<div class='card'><h4>Suggested Precautions</h4>"
+                            "<div class='card'><h4>🛡️ Suggested Precautions</h4>"
                             "<p>1. " + precs[0] + "</p><p>2. " + precs[1] + "</p>"
                             "<p>3. " + precs[2] + "</p><p>4. " + precs[3] + "</p></div>",
                             unsafe_allow_html=True)
 
+                    # Medicine suggestions
+                    if top_disease in MEDICINE_SUGGESTIONS:
+                        medicines = MEDICINE_SUGGESTIONS[top_disease]
+                        med_html = "<div class='medicine-card'><h4>💊 Suggested Medicines</h4><p><i>⚠️ Always consult a doctor before taking any medicine</i></p>"
+                        for med in medicines:
+                            med_html += "<p>💊 " + med + "</p>"
+                        med_html += "</div>"
+                        st.markdown(med_html, unsafe_allow_html=True)
+
                     if severity >= 7 or num_days >= 7:
-                        st.error("Symptoms seem serious! Please consult a doctor immediately!")
+                        st.error("🚨 Symptoms seem serious! Please consult a doctor immediately!")
                     else:
-                        st.success("Follow the precautions and monitor your symptoms.")
+                        st.success("💊 Follow the precautions and monitor your symptoms.")
 
                     precs_for_pdf = precautionDictionary.get(top_disease, ["", "", "", ""])
                     pdf_path = generate_pdf(user['name'], user['age'], user['gender'], symptoms_list, top_disease, top_confidence, desc, precs_for_pdf)
@@ -598,7 +776,7 @@ elif st.session_state['logged_in'] and st.session_state['user_type'] == 'patient
                     st.markdown("---")
                     st.markdown(
                         "<div class='chatbot-bubble'>🤖 <b>HealthBot:</b> Based on your symptoms, you most likely have <b>" + top_disease + "</b>. "
-                        "Would you like me to help you find a doctor and book an appointment?</div>", unsafe_allow_html=True)
+                        "Would you like me to help you find a doctor?</div>", unsafe_allow_html=True)
 
                     col1, col2 = st.columns(2)
                     with col1:
@@ -609,8 +787,7 @@ elif st.session_state['logged_in'] and st.session_state['user_type'] == 'patient
                             st.session_state['show_doctors'] = False
                             st.markdown(
                                 "<div class='result-card'><h3>Thank you, " + user['name'] + "! 🌟</h3>"
-                                "<p>Take care and get well soon!</p><p>💡 " + random.choice(quotes) + "</p></div>",
-                                unsafe_allow_html=True)
+                                "<p>💡 " + random.choice(quotes) + "</p></div>", unsafe_allow_html=True)
 
                     if st.session_state.get('show_doctors', False):
                         st.markdown("<div class='section-title'>👨‍⚕️ Recommended Doctors</div>", unsafe_allow_html=True)
@@ -628,18 +805,16 @@ elif st.session_state['logged_in'] and st.session_state['user_type'] == 'patient
                                 "<a href='" + maps_url + "' target='_blank' class='map-btn'>📍 Maps</a>"
                                 "<a href='" + directions_url + "' target='_blank' class='map-btn'>🗺️ Directions</a>"
                                 "</div>", unsafe_allow_html=True)
-                        st.info("Go to Book Appointment from the sidebar to book a slot!")
 
-    # ---- FIND DOCTORS ----
-    elif page == "👨‍⚕️ Find Doctors":
-        st.markdown("<div class='section-title'>👨‍⚕️ Find Nearby Doctors</div>", unsafe_allow_html=True)
+    # FIND DOCTORS
+    elif "Doctors" in page or "డాక్టర్" in page or "डॉक्टर" in page or "மருத்துவர்" in page:
+        st.markdown("<div class='section-title'>👨‍⚕️ " + L['find_doctors'] + "</div>", unsafe_allow_html=True)
         user_location = st.text_input("Enter your area/city", placeholder="e.g. Hyderabad, Ameerpet")
         if user_location:
-            maps_search = get_maps_search_url("doctors in " + user_location)
-            st.markdown("<a href='" + maps_search + "' target='_blank' class='map-btn'>🗺️ Search Doctors Near " + user_location + " on Google Maps</a><br><br>", unsafe_allow_html=True)
+            st.markdown("<a href='" + get_maps_search_url("doctors in " + user_location) + "' target='_blank' class='map-btn'>🗺️ Search on Google Maps</a><br><br>", unsafe_allow_html=True)
 
-        specialization_filter = st.selectbox("Filter by Specialization", ["All"] + list(doctors_df['specialization'].unique()))
-        filtered = doctors_df if specialization_filter == "All" else doctors_df[doctors_df['specialization'] == specialization_filter]
+        spec_filter = st.selectbox("Filter by Specialization", ["All"] + list(doctors_df['specialization'].unique()))
+        filtered = doctors_df if spec_filter == "All" else doctors_df[doctors_df['specialization'] == spec_filter]
 
         for _, doc in filtered.iterrows():
             maps_url = get_maps_url(doc['lat'], doc['lng'])
@@ -651,19 +826,18 @@ elif st.session_state['logged_in'] and st.session_state['user_type'] == 'patient
                 "<p>🏥 <b>Clinic:</b> " + doc['clinic'] + "</p>"
                 "<p>📞 <b>Contact:</b> " + str(doc['contact']) + "</p>"
                 "<p>📍 <b>Location:</b> " + doc['location'] + "</p>"
-                "<p>🕐 <b>Available Slots:</b> " + doc['slots'] + "</p><br>"
+                "<p>🕐 <b>Slots:</b> " + doc['slots'] + "</p><br>"
                 "<a href='" + call_url + "' class='call-btn'>📞 Call Doctor</a>"
                 "<a href='" + maps_url + "' target='_blank' class='map-btn'>📍 View on Maps</a>"
                 "<a href='" + directions_url + "' target='_blank' class='map-btn'>🗺️ Get Directions</a>"
                 "</div>", unsafe_allow_html=True)
 
-    # ---- FIND HOSPITALS ----
-    elif page == "🏥 Find Hospitals":
-        st.markdown("<div class='section-title'>🏥 Nearby Hospitals</div>", unsafe_allow_html=True)
+    # FIND HOSPITALS
+    elif "Hospital" in page or "ఆసుపత్రి" in page or "अस्पताल" in page or "மருத்துவமனை" in page:
+        st.markdown("<div class='section-title'>🏥 " + L['find_hospitals'] + "</div>", unsafe_allow_html=True)
         user_location = st.text_input("Enter your area/city", placeholder="e.g. Hyderabad, Ameerpet")
         if user_location:
-            maps_search = get_maps_search_url("hospitals in " + user_location)
-            st.markdown("<a href='" + maps_search + "' target='_blank' class='map-btn'>🗺️ Search Hospitals Near " + user_location + " on Google Maps</a><br><br>", unsafe_allow_html=True)
+            st.markdown("<a href='" + get_maps_search_url("hospitals in " + user_location) + "' target='_blank' class='map-btn'>🗺️ Search on Google Maps</a><br><br>", unsafe_allow_html=True)
 
         hospitals = [
             {"name": "Apollo Hospital", "address": "Jubilee Hills, Hyderabad", "contact": "9040000000", "speciality": "Multi-Specialty", "beds": 500, "lat": 17.4239, "lng": 78.4738},
@@ -672,58 +846,47 @@ elif st.session_state['logged_in'] and st.session_state['user_type'] == 'patient
             {"name": "Care Hospital", "address": "Banjara Hills, Hyderabad", "contact": "9040000003", "speciality": "Cardiac Care", "beds": 300, "lat": 17.4156, "lng": 78.4347},
             {"name": "Sunshine Hospital", "address": "PG Road, Hyderabad", "contact": "9040000004", "speciality": "General", "beds": 200, "lat": 17.4350, "lng": 78.4600},
         ]
-        for hospital in hospitals:
-            maps_url = get_maps_url(hospital['lat'], hospital['lng'])
-            directions_url = get_directions_url(hospital['lat'], hospital['lng'])
-            call_url = "tel:" + str(hospital['contact'])
+        for h in hospitals:
             st.markdown(
-                "<div class='hospital-card'><h3>🏥 " + hospital['name'] + "</h3>"
-                "<p>📍 <b>Address:</b> " + hospital['address'] + "</p>"
-                "<p>🩺 <b>Speciality:</b> " + hospital['speciality'] + "</p>"
-                "<p>🛏️ <b>Beds:</b> " + str(hospital['beds']) + "</p>"
-                "<p>📞 <b>Contact:</b> " + str(hospital['contact']) + "</p><br>"
-                "<a href='" + call_url + "' class='call-btn'>📞 Call Hospital</a>"
-                "<a href='" + maps_url + "' target='_blank' class='map-btn'>📍 View on Maps</a>"
-                "<a href='" + directions_url + "' target='_blank' class='map-btn'>🗺️ Get Directions</a>"
+                "<div class='hospital-card'><h3>🏥 " + h['name'] + "</h3>"
+                "<p>📍 <b>Address:</b> " + h['address'] + "</p>"
+                "<p>🩺 <b>Speciality:</b> " + h['speciality'] + "</p>"
+                "<p>🛏️ <b>Beds:</b> " + str(h['beds']) + "</p>"
+                "<p>📞 <b>Contact:</b> " + str(h['contact']) + "</p><br>"
+                "<a href='tel:" + str(h['contact']) + "' class='call-btn'>📞 Call</a>"
+                "<a href='" + get_maps_url(h['lat'], h['lng']) + "' target='_blank' class='map-btn'>📍 Maps</a>"
+                "<a href='" + get_directions_url(h['lat'], h['lng']) + "' target='_blank' class='map-btn'>🗺️ Directions</a>"
                 "</div>", unsafe_allow_html=True)
 
-    # ---- FIND PHARMACIES ----
-    elif page == "💊 Find Pharmacies":
-        st.markdown("<div class='section-title'>💊 Nearby Pharmacies</div>", unsafe_allow_html=True)
-        user_location = st.text_input("Enter your area/city", placeholder="e.g. Hyderabad, Ameerpet")
+    # FIND PHARMACIES
+    elif "Pharmac" in page or "మందు" in page or "फार्मेसी" in page or "மருந்தகம்" in page:
+        st.markdown("<div class='section-title'>💊 " + L['find_pharmacies'] + "</div>", unsafe_allow_html=True)
+        user_location = st.text_input("Enter your area/city")
         if user_location:
-            maps_search = get_maps_search_url("pharmacy in " + user_location)
-            st.markdown("<a href='" + maps_search + "' target='_blank' class='map-btn'>🗺️ Search Pharmacies Near " + user_location + " on Google Maps</a><br><br>", unsafe_allow_html=True)
+            st.markdown("<a href='" + get_maps_search_url("pharmacy in " + user_location) + "' target='_blank' class='map-btn'>🗺️ Search on Google Maps</a><br><br>", unsafe_allow_html=True)
 
-        for _, pharmacy in pharmacies_df.iterrows():
-            maps_url = get_maps_url(pharmacy['lat'], pharmacy['lng'])
-            directions_url = get_directions_url(pharmacy['lat'], pharmacy['lng'])
-            call_url = "tel:" + str(pharmacy['contact'])
+        for _, p in pharmacies_df.iterrows():
             st.markdown(
-                "<div class='pharmacy-card'><h3>💊 " + pharmacy['name'] + "</h3>"
-                "<p>📍 <b>Address:</b> " + pharmacy['address'] + "</p>"
-                "<p>📞 <b>Contact:</b> " + str(pharmacy['contact']) + "</p><br>"
-                "<a href='" + call_url + "' class='call-btn'>📞 Call Pharmacy</a>"
-                "<a href='" + maps_url + "' target='_blank' class='map-btn'>📍 View on Maps</a>"
-                "<a href='" + directions_url + "' target='_blank' class='map-btn'>🗺️ Get Directions</a>"
+                "<div class='pharmacy-card'><h3>💊 " + p['name'] + "</h3>"
+                "<p>📍 <b>Address:</b> " + p['address'] + "</p>"
+                "<p>📞 <b>Contact:</b> " + str(p['contact']) + "</p><br>"
+                "<a href='tel:" + str(p['contact']) + "' class='call-btn'>📞 Call</a>"
+                "<a href='" + get_maps_url(p['lat'], p['lng']) + "' target='_blank' class='map-btn'>📍 Maps</a>"
+                "<a href='" + get_directions_url(p['lat'], p['lng']) + "' target='_blank' class='map-btn'>🗺️ Directions</a>"
                 "</div>", unsafe_allow_html=True)
 
-    # ---- BOOK APPOINTMENT ----
-    elif page == "📅 Book Appointment":
-        st.markdown("<div class='section-title'>📅 Book Doctor Appointment</div>", unsafe_allow_html=True)
+    # BOOK APPOINTMENT
+    elif "Book" in page or "అపాయింట్" in page or "अपॉइंट" in page or "சந்திப்பு" in page:
+        st.markdown("<div class='section-title'>📅 " + L['book'] + "</div>", unsafe_allow_html=True)
         col1, col2 = st.columns(2)
         with col1:
-            patient_name = st.text_input("Your Name", value=user['name'])
+            patient_name = st.text_input(L['name'], value=user['name'])
         with col2:
-            patient_contact = st.text_input("Your Contact", value=user['contact'])
+            patient_contact = st.text_input(L['contact'], value=user['contact'])
 
         disease_info = st.text_input("Disease/Reason", value=st.session_state.get('disease', ''))
         selected_doctor = st.selectbox("Select Doctor", doctors_df['name'].tolist())
         doctor_info = doctors_df[doctors_df['name'] == selected_doctor].iloc[0]
-
-        maps_url = get_maps_url(doctor_info['lat'], doctor_info['lng'])
-        directions_url = get_directions_url(doctor_info['lat'], doctor_info['lng'])
-        call_url = "tel:" + str(doctor_info['contact'])
 
         st.markdown(
             "<div class='doctor-card'>"
@@ -731,9 +894,9 @@ elif st.session_state['logged_in'] and st.session_state['user_type'] == 'patient
             "<p>🩺 <b>Specialization:</b> " + doctor_info['specialization'] + "</p>"
             "<p>📍 <b>Location:</b> " + doctor_info['location'] + "</p>"
             "<p>📞 <b>Contact:</b> " + str(doctor_info['contact']) + "</p><br>"
-            "<a href='" + call_url + "' class='call-btn'>📞 Call Doctor</a>"
-            "<a href='" + maps_url + "' target='_blank' class='map-btn'>📍 View on Maps</a>"
-            "<a href='" + directions_url + "' target='_blank' class='map-btn'>🗺️ Get Directions</a>"
+            "<a href='tel:" + str(doctor_info['contact']) + "' class='call-btn'>📞 Call Doctor</a>"
+            "<a href='" + get_maps_url(doctor_info['lat'], doctor_info['lng']) + "' target='_blank' class='map-btn'>📍 Maps</a>"
+            "<a href='" + get_directions_url(doctor_info['lat'], doctor_info['lng']) + "' target='_blank' class='map-btn'>🗺️ Directions</a>"
             "</div>", unsafe_allow_html=True)
 
         col1, col2 = st.columns(2)
@@ -742,7 +905,7 @@ elif st.session_state['logged_in'] and st.session_state['user_type'] == 'patient
         with col2:
             appointment_date = st.date_input("Select Date")
 
-        if st.button("Confirm Appointment"):
+        if st.button("✅ Confirm Appointment"):
             conn = sqlite3.connect('health_app.db')
             c = conn.cursor()
             c.execute('''INSERT INTO appointments (patient_name, patient_contact, patient_email, doctor_name, clinic, date, slot, disease)
@@ -760,28 +923,68 @@ elif st.session_state['logged_in'] and st.session_state['user_type'] == 'patient
                 "<p><b>Time:</b> " + selected_slot + "</p>"
                 "<p><b>Reason:</b> " + disease_info + "</p></div>", unsafe_allow_html=True)
 
-    # ---- MY APPOINTMENTS ----
-    elif page == "📋 My Appointments":
-        st.markdown("<div class='section-title'>📋 My Appointments</div>", unsafe_allow_html=True)
+    # MY APPOINTMENTS
+    elif "Appointment" in page or "అపాయింట్‌మెంట్లు" in page or "अपॉइंटमेंट" in page or "சந்திப்புகள்" in page:
+        st.markdown("<div class='section-title'>📋 " + L['my_appointments'] + "</div>", unsafe_allow_html=True)
         conn = sqlite3.connect('health_app.db')
-        df = pd.read_sql_query("SELECT * FROM appointments WHERE patient_email=?", conn, params=(user['email'],))
+        df = pd.read_sql_query("SELECT * FROM appointments WHERE patient_email=? ORDER BY created_at DESC", conn, params=(user['email'],))
         conn.close()
         if df.empty:
-            st.info("You have no appointments yet. Book one from the Book Appointment page!")
+            st.info("No appointments yet!")
         else:
             st.success("You have " + str(len(df)) + " appointment(s)!")
             for _, apt in df.iterrows():
                 st.markdown(
-                    "<div class='result-card'><h4>📅 Appointment #" + str(apt['id']) + "</h4>"
+                    "<div class='result-card'><h4>📅 #" + str(apt['id']) + "</h4>"
                     "<p><b>Doctor:</b> " + str(apt['doctor_name']) + "</p>"
                     "<p><b>Clinic:</b> " + str(apt['clinic']) + "</p>"
                     "<p><b>Date:</b> " + str(apt['date']) + "</p>"
                     "<p><b>Time:</b> " + str(apt['slot']) + "</p>"
                     "<p><b>Reason:</b> " + str(apt['disease']) + "</p></div>", unsafe_allow_html=True)
 
-    # ---- MY PROFILE ----
-    elif page == "👤 My Profile":
-        st.markdown("<div class='section-title'>👤 My Profile</div>", unsafe_allow_html=True)
+    # HEALTH HISTORY
+    elif "History" in page:
+        st.markdown("<div class='section-title'>📈 Health History</div>", unsafe_allow_html=True)
+        conn = sqlite3.connect('health_app.db')
+        df = pd.read_sql_query("SELECT * FROM health_history WHERE patient_email=? ORDER BY created_at DESC", conn, params=(user['email'],))
+        conn.close()
+
+        if df.empty:
+            st.info("No health history yet. Start by predicting a disease!")
+        else:
+            st.success("You have " + str(len(df)) + " health record(s)!")
+
+            # Disease frequency chart
+            disease_counts = df['disease'].value_counts().reset_index()
+            disease_counts.columns = ['Disease', 'Count']
+            fig1 = px.bar(disease_counts, x='Disease', y='Count',
+                title='Disease Frequency',
+                color='Count', color_continuous_scale='Blues')
+            fig1.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='white')
+            st.plotly_chart(fig1, use_container_width=True)
+
+            # Confidence over time
+            if len(df) > 1:
+                fig2 = px.line(df, x='date', y='confidence',
+                    title='Confidence Score Over Time',
+                    markers=True, color_discrete_sequence=['#00b4d8'])
+                fig2.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='white')
+                st.plotly_chart(fig2, use_container_width=True)
+
+            # History table
+            st.markdown("<div class='section-title'>📋 Detailed History</div>", unsafe_allow_html=True)
+            for _, record in df.iterrows():
+                st.markdown(
+                    "<div class='card'>"
+                    "<p>📅 <b>Date:</b> " + str(record['date']) + "</p>"
+                    "<p>🩺 <b>Disease:</b> " + str(record['disease']) + "</p>"
+                    "<p>🎯 <b>Confidence:</b> " + str(record['confidence']) + "%</p>"
+                    "<p>🤒 <b>Symptoms:</b> " + str(record['symptoms']) + "</p>"
+                    "</div>", unsafe_allow_html=True)
+
+    # MY PROFILE
+    elif "Profile" in page or "ప్రొఫైల్" in page or "प्रोफाइल" in page or "சுயவிவரம்" in page:
+        st.markdown("<div class='section-title'>👤 " + L['profile'] + "</div>", unsafe_allow_html=True)
         st.markdown(
             "<div class='result-card'>"
             "<h3>👤 " + user['name'] + "</h3>"
@@ -800,10 +1003,91 @@ elif st.session_state['logged_in'] and st.session_state['user_type'] == 'doctor'
         st.markdown("<h2 style='color:#9b59b6;'>🏥 HealthBot</h2>", unsafe_allow_html=True)
         st.markdown("<div class='welcome-card'><p>👨‍⚕️ <b>Dr. " + doctor['name'] + "</b></p><p style='color:#8892a4;'>" + doctor['specialization'] + "</p></div>", unsafe_allow_html=True)
         st.markdown("---")
+        page = st.selectbox("Navigate To", ["🏠 Dashboard", "📋 All Appointments", "👨‍⚕️ My Profile"])
+        st.markdown("---")
+        if st.button("🚪 " + L['logout'], use_container_width=True):
+            for key in ['logged_in', 'user_type', 'user_data']:
+                if key in st.session_state:
+                    del st.session_state[key]
+            st.session_state['logged_in'] = False
+            st.rerun()
+
+    if page == "🏠 Dashboard":
+        st.markdown("<div class='section-title'>🏠 Welcome Dr. " + doctor['name'] + "!</div>", unsafe_allow_html=True)
+
+        conn = sqlite3.connect('health_app.db')
+        total = pd.read_sql_query("SELECT COUNT(*) as c FROM appointments WHERE doctor_name=?", conn, params=(doctor['name'],)).iloc[0]['c']
+        today = pd.read_sql_query("SELECT COUNT(*) as c FROM appointments WHERE doctor_name=? AND date=?", conn, params=(doctor['name'], str(date.today()))).iloc[0]['c']
+        df_all = pd.read_sql_query("SELECT * FROM appointments WHERE doctor_name=? ORDER BY created_at DESC", conn, params=(doctor['name'],))
+        conn.close()
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.markdown("<div class='metric-card'><div class='metric-value'>" + str(total) + "</div><div class='metric-label'>Total Appointments</div></div>", unsafe_allow_html=True)
+        with col2:
+            st.markdown("<div class='metric-card'><div class='metric-value'>" + str(today) + "</div><div class='metric-label'>Today's Appointments</div></div>", unsafe_allow_html=True)
+        with col3:
+            st.markdown("<div class='metric-card'><div class='metric-value'>" + doctor['specialization'] + "</div><div class='metric-label'>Specialization</div></div>", unsafe_allow_html=True)
+
+        if not df_all.empty:
+            # Disease distribution chart
+            disease_counts = df_all['disease'].value_counts().reset_index()
+            disease_counts.columns = ['Disease', 'Count']
+            fig = px.pie(disease_counts, names='Disease', values='Count', title='Patient Disease Distribution')
+            fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='white')
+            st.plotly_chart(fig, use_container_width=True)
+
+        st.markdown("<div class='section-title'>📋 Recent Patients</div>", unsafe_allow_html=True)
+        if df_all.empty:
+            st.info("No appointments yet.")
+        else:
+            for _, apt in df_all.head(5).iterrows():
+                st.markdown(
+                    "<div class='doctor-card'><h4>👤 " + str(apt['patient_name']) + "</h4>"
+                    "<p>📞 <b>Contact:</b> " + str(apt['patient_contact']) + "</p>"
+                    "<p>📅 <b>Date:</b> " + str(apt['date']) + " | 🕐 " + str(apt['slot']) + "</p>"
+                    "<p>🩺 <b>Reason:</b> " + str(apt['disease']) + "</p></div>", unsafe_allow_html=True)
+
+    elif page == "📋 All Appointments":
+        st.markdown("<div class='section-title'>📋 All Appointments</div>", unsafe_allow_html=True)
+        conn = sqlite3.connect('health_app.db')
+        df = pd.read_sql_query("SELECT * FROM appointments WHERE doctor_name=? ORDER BY date DESC", conn, params=(doctor['name'],))
+        conn.close()
+        if df.empty:
+            st.info("No appointments yet.")
+        else:
+            st.success("Total " + str(len(df)) + " appointment(s)!")
+            for _, apt in df.iterrows():
+                st.markdown(
+                    "<div class='doctor-card'><h4>👤 " + str(apt['patient_name']) + "</h4>"
+                    "<p>📞 <b>Contact:</b> " + str(apt['patient_contact']) + "</p>"
+                    "<p>📧 <b>Email:</b> " + str(apt['patient_email']) + "</p>"
+                    "<p>📅 <b>Date:</b> " + str(apt['date']) + " | 🕐 " + str(apt['slot']) + "</p>"
+                    "<p>🩺 <b>Reason:</b> " + str(apt['disease']) + "</p></div>", unsafe_allow_html=True)
+
+    elif page == "👨‍⚕️ My Profile":
+        st.markdown("<div class='section-title'>👨‍⚕️ My Profile</div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div class='result-card'><h3>👨‍⚕️ Dr. " + doctor['name'] + "</h3>"
+            "<p>📧 <b>Email:</b> " + doctor['email'] + "</p>"
+            "<p>🩺 <b>Specialization:</b> " + doctor['specialization'] + "</p>"
+            "<p>🏥 <b>Clinic:</b> " + str(doctor['clinic']) + "</p>"
+            "<p>📞 <b>Contact:</b> " + str(doctor['contact']) + "</p>"
+            "<p>🕐 <b>Slots:</b> " + str(doctor['slots']) + "</p>"
+            "<p>📍 <b>Location:</b> " + str(doctor['location']) + "</p></div>", unsafe_allow_html=True)
+
+
+# ==================== ADMIN DASHBOARD ====================
+elif st.session_state['logged_in'] and st.session_state['user_type'] == 'admin':
+    with st.sidebar:
+        st.markdown("<h2 style='color:#e74c3c;'>🔧 Admin Panel</h2>", unsafe_allow_html=True)
+        st.markdown("---")
         page = st.selectbox("Navigate To", [
-            "🏠 Doctor Dashboard",
-            "📋 My Appointments",
-            "👨‍⚕️ My Profile"
+            "📊 Overview",
+            "👤 All Patients",
+            "👨‍⚕️ All Doctors",
+            "📅 All Appointments",
+            "📈 Analytics"
         ])
         st.markdown("---")
         if st.button("🚪 Logout", use_container_width=True):
@@ -812,84 +1096,95 @@ elif st.session_state['logged_in'] and st.session_state['user_type'] == 'doctor'
             st.session_state['user_data'] = None
             st.rerun()
 
-    # ---- DOCTOR DASHBOARD ----
-    if page == "🏠 Doctor Dashboard":
-        st.markdown("<div class='section-title'>🏠 Welcome Dr. " + doctor['name'] + "!</div>", unsafe_allow_html=True)
+    # OVERVIEW
+    if page == "📊 Overview":
+        st.markdown("<div class='section-title'>📊 Admin Overview</div>", unsafe_allow_html=True)
 
-        # Stats
         conn = sqlite3.connect('health_app.db')
-        total_appointments = pd.read_sql_query("SELECT COUNT(*) as count FROM appointments WHERE doctor_name=?",
-            conn, params=(doctor['name'],)).iloc[0]['count']
-        today_appointments = pd.read_sql_query("SELECT COUNT(*) as count FROM appointments WHERE doctor_name=? AND date=date('now')",
-            conn, params=(doctor['name'],)).iloc[0]['count']
+        total_patients = pd.read_sql_query("SELECT COUNT(*) as c FROM patients", conn).iloc[0]['c']
+        total_doctors = pd.read_sql_query("SELECT COUNT(*) as c FROM doctors_login", conn).iloc[0]['c']
+        total_appointments = pd.read_sql_query("SELECT COUNT(*) as c FROM appointments", conn).iloc[0]['c']
+        total_history = pd.read_sql_query("SELECT COUNT(*) as c FROM health_history", conn).iloc[0]['c']
         conn.close()
 
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
-            st.markdown(
-                "<div class='metric-card'><div class='metric-value'>" + str(total_appointments) + "</div>"
-                "<div class='metric-label'>Total Appointments</div></div>", unsafe_allow_html=True)
+            st.markdown("<div class='metric-card'><div class='metric-value'>" + str(total_patients) + "</div><div class='metric-label'>Total Patients</div></div>", unsafe_allow_html=True)
         with col2:
-            st.markdown(
-                "<div class='metric-card'><div class='metric-value'>" + str(today_appointments) + "</div>"
-                "<div class='metric-label'>Today's Appointments</div></div>", unsafe_allow_html=True)
+            st.markdown("<div class='metric-card'><div class='metric-value'>" + str(total_doctors) + "</div><div class='metric-label'>Total Doctors</div></div>", unsafe_allow_html=True)
         with col3:
-            st.markdown(
-                "<div class='metric-card'><div class='metric-value'>" + doctor['specialization'] + "</div>"
-                "<div class='metric-label'>Specialization</div></div>", unsafe_allow_html=True)
+            st.markdown("<div class='metric-card'><div class='metric-value'>" + str(total_appointments) + "</div><div class='metric-label'>Total Appointments</div></div>", unsafe_allow_html=True)
+        with col4:
+            st.markdown("<div class='metric-card'><div class='metric-value'>" + str(total_history) + "</div><div class='metric-label'>Health Records</div></div>", unsafe_allow_html=True)
 
-        st.markdown("<div class='section-title'>📋 Recent Appointments</div>", unsafe_allow_html=True)
+    # ALL PATIENTS
+    elif page == "👤 All Patients":
+        st.markdown("<div class='section-title'>👤 All Patients</div>", unsafe_allow_html=True)
         conn = sqlite3.connect('health_app.db')
-        df = pd.read_sql_query("SELECT * FROM appointments WHERE doctor_name=? ORDER BY created_at DESC LIMIT 5",
-            conn, params=(doctor['name'],))
+        df = pd.read_sql_query("SELECT id, name, email, age, gender, contact, created_at FROM patients", conn)
         conn.close()
-
         if df.empty:
-            st.info("No appointments yet.")
+            st.info("No patients registered yet.")
         else:
-            for _, apt in df.iterrows():
-                st.markdown(
-                    "<div class='doctor-card'>"
-                    "<h4>👤 Patient: " + str(apt['patient_name']) + "</h4>"
-                    "<p>📞 <b>Contact:</b> " + str(apt['patient_contact']) + "</p>"
-                    "<p>📅 <b>Date:</b> " + str(apt['date']) + "</p>"
-                    "<p>🕐 <b>Time:</b> " + str(apt['slot']) + "</p>"
-                    "<p>🩺 <b>Reason:</b> " + str(apt['disease']) + "</p>"
-                    "</div>", unsafe_allow_html=True)
+            st.success("Total " + str(len(df)) + " patient(s)!")
+            st.dataframe(df, use_container_width=True)
 
-    # ---- ALL APPOINTMENTS ----
-    elif page == "📋 My Appointments":
-        st.markdown("<div class='section-title'>📋 All My Appointments</div>", unsafe_allow_html=True)
+    # ALL DOCTORS
+    elif page == "👨‍⚕️ All Doctors":
+        st.markdown("<div class='section-title'>👨‍⚕️ All Doctors</div>", unsafe_allow_html=True)
         conn = sqlite3.connect('health_app.db')
-        df = pd.read_sql_query("SELECT * FROM appointments WHERE doctor_name=? ORDER BY date DESC",
-            conn, params=(doctor['name'],))
+        df = pd.read_sql_query("SELECT id, name, email, specialization, clinic, contact, location FROM doctors_login", conn)
         conn.close()
+        if df.empty:
+            st.info("No doctors registered yet.")
+        else:
+            st.success("Total " + str(len(df)) + " doctor(s)!")
+            st.dataframe(df, use_container_width=True)
 
+    # ALL APPOINTMENTS
+    elif page == "📅 All Appointments":
+        st.markdown("<div class='section-title'>📅 All Appointments</div>", unsafe_allow_html=True)
+        conn = sqlite3.connect('health_app.db')
+        df = pd.read_sql_query("SELECT * FROM appointments ORDER BY created_at DESC", conn)
+        conn.close()
         if df.empty:
             st.info("No appointments yet.")
         else:
             st.success("Total " + str(len(df)) + " appointment(s)!")
-            for _, apt in df.iterrows():
-                st.markdown(
-                    "<div class='doctor-card'>"
-                    "<h4>👤 " + str(apt['patient_name']) + "</h4>"
-                    "<p>📞 <b>Contact:</b> " + str(apt['patient_contact']) + "</p>"
-                    "<p>📧 <b>Email:</b> " + str(apt['patient_email']) + "</p>"
-                    "<p>📅 <b>Date:</b> " + str(apt['date']) + "</p>"
-                    "<p>🕐 <b>Time:</b> " + str(apt['slot']) + "</p>"
-                    "<p>🩺 <b>Reason:</b> " + str(apt['disease']) + "</p>"
-                    "</div>", unsafe_allow_html=True)
+            st.dataframe(df, use_container_width=True)
 
-    # ---- DOCTOR PROFILE ----
-    elif page == "👨‍⚕️ My Profile":
-        st.markdown("<div class='section-title'>👨‍⚕️ My Profile</div>", unsafe_allow_html=True)
-        st.markdown(
-            "<div class='result-card'>"
-            "<h3>👨‍⚕️ Dr. " + doctor['name'] + "</h3>"
-            "<p>📧 <b>Email:</b> " + doctor['email'] + "</p>"
-            "<p>🩺 <b>Specialization:</b> " + doctor['specialization'] + "</p>"
-            "<p>🏥 <b>Clinic:</b> " + str(doctor['clinic']) + "</p>"
-            "<p>📞 <b>Contact:</b> " + str(doctor['contact']) + "</p>"
-            "<p>🕐 <b>Slots:</b> " + str(doctor['slots']) + "</p>"
-            "<p>📍 <b>Location:</b> " + str(doctor['location']) + "</p>"
-            "</div>", unsafe_allow_html=True)
+    # ANALYTICS
+    elif page == "📈 Analytics":
+        st.markdown("<div class='section-title'>📈 Analytics</div>", unsafe_allow_html=True)
+        conn = sqlite3.connect('health_app.db')
+        history_df = pd.read_sql_query("SELECT * FROM health_history", conn)
+        appointments_df = pd.read_sql_query("SELECT * FROM appointments", conn)
+        conn.close()
+
+        if not history_df.empty:
+            # Most common diseases
+            disease_counts = history_df['disease'].value_counts().head(10).reset_index()
+            disease_counts.columns = ['Disease', 'Count']
+            fig1 = px.bar(disease_counts, x='Count', y='Disease', orientation='h',
+                title='Top 10 Most Common Diseases',
+                color='Count', color_continuous_scale='Blues')
+            fig1.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='white')
+            st.plotly_chart(fig1, use_container_width=True)
+
+        if not appointments_df.empty:
+            # Appointments by doctor
+            doc_counts = appointments_df['doctor_name'].value_counts().reset_index()
+            doc_counts.columns = ['Doctor', 'Appointments']
+            fig2 = px.pie(doc_counts, names='Doctor', values='Appointments', title='Appointments by Doctor')
+            fig2.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='white')
+            st.plotly_chart(fig2, use_container_width=True)
+
+            # Disease distribution in appointments
+            disease_apt = appointments_df['disease'].value_counts().reset_index()
+            disease_apt.columns = ['Disease', 'Count']
+            fig3 = px.bar(disease_apt, x='Disease', y='Count', title='Disease Distribution in Appointments',
+                color='Count', color_continuous_scale='Reds')
+            fig3.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='white')
+            st.plotly_chart(fig3, use_container_width=True)
+        else:
+            st.info("No data available for analytics yet.")
